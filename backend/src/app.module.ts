@@ -25,6 +25,7 @@ import { PlayerCardMetadataModule } from './player-card-metadata/player-card-met
 import { PostsModule } from './posts/posts.module';
 import { PredictionsModule } from './predictions/predictions.module';
 import { FreeBetVouchersModule } from './free-bet-vouchers/free-bet-vouchers.module';
+import { StakingModule } from './staking/staking.module';
 import { validate } from './common/config/env.validation';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { LeaderboardsModule } from './leaderboards/leaderboards.module';
@@ -34,13 +35,26 @@ import { CacheConfigModule } from './common/cache/cache.module';
 import { AdminModule } from './admin/admin.module';
 import { UserLeaderboardStats } from './leaderboard/entities/user-leaderboard-stats.entity';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
+import { UsersModule } from './users/users.module';
 
 import { LoggerModule } from './common/logger/logger.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { SpinGameModule } from './spin-game/spin-game.module';
-import { StakingModule } from './staking/staking.module';
 import { Leaderboard } from './leaderboard/entities/leaderboard.entity';
+import { ProgressModule } from './progress/progress.module';
+import { SolvencyModule } from './solvency/solvency.module';
+import { AuditModule } from './audit/audit.module';
+import { CircuitBreakerGuard } from './auth/guards/circuit-breaker.guard';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { EventListenerModule } from './common/events/event-listener.module';
+import { NFTModule } from './nft/nft.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { GamificationModule } from './gamification/gamification.module';
+import { Achievement } from './gamification/entities/achievement.entity';
+import { UserAchievement } from './gamification/entities/user-achievement.entity';
 
+// Custom role-based guard
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
 
 @Module({
   imports: [
@@ -59,7 +73,7 @@ import { Leaderboard } from './leaderboard/entities/leaderboard.entity';
         throttlers: [
           {
             ttl: config.get<number>('THROTTLE_TTL', 60000), // 60 seconds
-            limit: config.get<number>('THROTTLE_LIMIT', 10), // 10 requests
+            limit: config.get<number>('THROTTLE_LIMIT', 10), // default 10 requests/min
           },
         ],
       }),
@@ -81,33 +95,51 @@ import { Leaderboard } from './leaderboard/entities/leaderboard.entity';
       PlayerCardMetadata,
       Prediction,
       Leaderboard,
+      FreeBetVoucher,
+      Spin,
+      SpinSession,
+      UserLeaderboardStats,
+      Achievement,
+      UserAchievement,
+    ]),
     SpinGameModule,
-      FreeBetVoucher,
-      Spin,
-      SpinSession,
-      UserLeaderboardStats,
-      FreeBetVoucher,
-      Spin,
-      SpinSession,
-      UserLeaderboardStats,
+    RateLimitModule,
     StakingModule,
-    LeaderboardModule,
     LeaderboardModule,
     FreeBetVouchersModule,
     SpinModule,
     LeaderboardsModule,
+    UsersModule,
     HealthModule,
     CacheConfigModule,
     AdminModule,
     ReconciliationModule,
     LoggerModule,
+    EventListenerModule,
+    NFTModule,
+    ProgressModule,
+    SolvencyModule,
+    AuditModule,
+    NotificationsModule,
+    GamificationModule,
+  ],
+  providers: [
+    {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: ThrottlerGuard, // baseline throttling
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard, // role-based limits
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CircuitBreakerGuard,
     },
   ],
 })
 export class AppModule {
-    configure(consumer: MiddlewareConsumer) {
+  configure(consumer: MiddlewareConsumer) {
     consumer.apply(CorrelationIdMiddleware).forRoutes('*');
   }
 }
